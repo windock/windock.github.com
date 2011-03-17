@@ -1,0 +1,128 @@
+<html>
+<h1>Instance Variables Are Evil</h1> 
+ 
+<ol> 
+<li><p>If you’re interacting directly with an instance variable and it’s not inside an accessor or mutator method, you’re breaking encapsulation and promoting close coupling in the design of your object system. 
+<a href="http://blog.voxdolo.me/a-diatribe-on-maintaining-state.html">http://blog.voxdolo.me/a-diatribe-on-maintaining-state.html</a></p></li> 
+<li><p>When one method A sets up instance variable and then it is used in another method B:</p> 
+ 
+<pre> 
+class BadController
+  before_filter :create_search
+  before_filter :setup_my_search_with_params
+ 
+ 
+  def index
+    @search.perform_search
+  end
+ 
+ 
+  private
+ 
+ 
+    def create_search
+      @search = ActiveSearch.new(huge_list_of_parameters)
+    end
+ 
+ 
+    def setup_my_search_with_params
+      @search.setup_search_with_params(params)
+    end
+ 
+ 
+end
+ 
+ 
+class BetterController
+  def index
+    @search = ready_to_use_search
+    @search.perform_search
+  end
+ 
+ 
+  private
+ 
+ 
+    def ready_to_use_search
+      search.setup_search_with_params(params)
+    end
+ 
+ 
+    def search
+      ActiveSearch.new(huge_list_of_parameters)
+    end
+end
+</pre> 
+ 
+<p>pros:</p> 
+ 
+<ol> 
+<li>we do not depend on the sequence of calls, so we reduce number of bugs caused by using objects which were not set up</li> 
+<li>methods are called only when neccessary, thus we
+<ol> 
+<li>reduce number of bugs caused by calling a method when it was a bad idea - say, setting up active_search object for chart generation in SERP Archive</li> 
+<li>increase speed
+*increases readability - we may see a sequence of calls in one place, without need to check all the before filters, constructors, super classes, etc</li> 
+</ol></li> 
+</ol> 
+ 
+<p>the rule of thumb: if we depend on sequence of calls of before_filters - it&#8217;s bad</p></li> 
+<li><p>When instance variable is used to store results of computation:</p> 
+ 
+<pre> 
+class BadController
+  #view uses variable @filters 
+ 
+  def index
+    update_filter_config
+    find_everything
+  end
+ 
+ 
+  def update_filter_config
+    @selected_time_period = params[:filter_time_period]["checked"][0] rescue 30
+    set_filters
+  end
+ 
+ 
+  def set_filters
+    @filters = [Filter.new(:foo => @selected_time_period)]
+  end
+ 
+end
+ 
+ 
+class BetterController
+  #view uses method filters
+ 
+  def index
+    find_everything
+  end
+ 
+ 
+  def filters
+    [Filter.new(:foo => selected_time_period)]
+  end
+  helper_method :filters
+ 
+ 
+  private
+ 
+ 
+    def selected_time_period
+      params[:filter_time_period]["checked"][0]
+    rescue
+      30
+    end
+ 
+end
+</pre> 
+ 
+<p>pros:</p> 
+ 
+<ol> 
+<li>coupling between controller and view is decreased</li> 
+<li>the same as 2)</li> 
+</ol></li> 
+</ol>
+</html>
